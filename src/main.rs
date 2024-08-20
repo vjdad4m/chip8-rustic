@@ -12,7 +12,7 @@ use std::time::{Duration, Instant};
 fn main() -> ! {
     let matches = Command::new("CHIP-8 Emulator")
         .version("1.0")
-        .author("Your Name <adam@vayda.xyz>")
+        .author("Adam Vajda <adam@vayda.xyz>")
         .about("Emulates CHIP-8 programs")
         .arg(
             Arg::new("rom")
