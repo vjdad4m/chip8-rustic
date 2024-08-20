@@ -1,12 +1,12 @@
 extern crate sdl2;
 
-use sdl2::event::{self, Event};
+use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
 use sdl2::pixels::Color;
 use sdl2::rect::Rect;
 use sdl2::render::Canvas;
 use sdl2::video::Window;
-use sdl2::{EventPump, Sdl};
+use sdl2::EventPump;
 
 struct Chip8State {
     memory: [u8; 4096], // 4KB
@@ -130,7 +130,7 @@ fn get_keypress(event_pump: &mut EventPump) -> u8 {
 }
 
 fn main() -> ! {
-    let fps: u64 = 480;
+    let fps: u64 = 1000;
     let cap_fps: bool = true;
 
     let sdl_context = sdl2::init().unwrap();
@@ -144,7 +144,7 @@ fn main() -> ! {
 
     let mut canvas = window.into_canvas().build().unwrap();
 
-    let rom = std::fs::read("rom/superpong.ch8").unwrap();
+    let rom = std::fs::read("rom/sk8.ch8").unwrap();
 
     let mut state = Chip8State {
         memory: [0; 4096],
@@ -180,56 +180,73 @@ fn main() -> ! {
         match inst {
             0x0000 => {
                 match opcode {
+                    // clear
                     0x00E0 => {
                         state.gfx = [0; 64 * 32];
                         state.pc += 2;
                     }
+                    // return
                     0x00EE =>  {
                         state.sp -= 1;
                         state.pc = state.stack[state.sp as usize];
                         state.pc += 2;
                     }
+                    // 0x0N 0xNN
                     _ => {
-                        panic!("Unknown instruction: 0x{:04X} (0x{:4X})", inst, opcode);
+                        state.pc = address;
                     }
                 }
             }
+            // jump NNN
             0x1000 => {
                 state.pc = address;
             }
+            // :call NNN
             0x2000 => {
                 state.stack[state.sp as usize] = state.pc;
                 state.sp += 1;
                 state.pc = address;
             }
+            // if vX != NN then
             0x3000 => {
                 if state.v[x as usize] == kk as u8 { state.pc += 4; }
                 else { state.pc += 2; }
             }
+            // if vX == NN then
             0x4000 => {
                 if state.v[x as usize] != kk as u8 { state.pc += 4; }
                 else { state.pc += 2; }
             }
+            // if vX != vY then
+            0x5000 => {
+                if state.v[x as usize] == state.v[y as usize] { state.pc += 4; }
+                else { state.pc += 2; }
+            }
+            // vX := NN
             0x6000 => {
                 state.v[x as usize] = kk as u8;
                 state.pc += 2;
             }
+            // vX += NN
             0x7000 => {
                 state.v[x as usize] = (state.v[x as usize] as u16 + kk) as u8;
                 state.pc += 2;
             }
             0x8000 => {
                 match n {
+                    // vX := vY
                     0x0 => {
                         state.v[x as usize] = state.v[y as usize];
                         state.pc += 2;
                     }
+                    // vX += vY
                     0x4 => {
                         let sum = state.v[x as usize] as u16 + state.v[y as usize] as u16;
                         state.v[0xF] = if sum > 0xFF { 1 } else { 0 };
                         state.v[x as usize] = sum as u8;
                         state.pc += 2;
                     }
+                    // vX -= vY
                     0x5 => {
                         if state.v[x as usize] > state.v[y as usize] {
                             state.v[0xF] = 1;
@@ -239,6 +256,7 @@ fn main() -> ! {
                         state.v[x as usize] = state.v[x as usize].wrapping_sub(state.v[y as usize]);
                         state.pc += 2;
                     }
+                    // vX =- vY
                     0x7 => {
                         if state.v[y as usize] > state.v[x as usize] {
                             state.v[0xF] = 1;
@@ -253,14 +271,26 @@ fn main() -> ! {
                     }
                 }
             }
+            // if vX == vY then
+            0x9000 => {
+                if state.v[x as usize] != state.v[y as usize] { state.pc += 4; }
+                else { state.pc += 2; }
+            }
+            // i := NNN
             0xA000 => {
                 state.i = address;
                 state.pc += 2;
             }
+            // jump0 NNN
+            0xB000 => {
+                state.pc = address + state.v[0] as u16;
+            }
+            // vX := random NN
             0xC000 => {
                 state.v[x as usize] = rand::random::<u8>() & kk as u8;
                 state.pc += 2;
             }
+            // sprite vX vY N
             0xD000 => {
                 let x = state.v[x as usize] as usize;
                 let y = state.v[y as usize] as usize;
@@ -282,6 +312,7 @@ fn main() -> ! {
             }
             0xE000 => {
                 match kk {
+                    // if vX -key then
                     0x9E => {
                         if state.key[state.v[x as usize] as usize] == 1 {
                             state.pc += 4;
@@ -289,6 +320,7 @@ fn main() -> ! {
                             state.pc += 2;
                         }
                     }
+                    // if vX key then
                     0xA1 => {
                         if state.key[state.v[x as usize] as usize] == 0 {
                             state.pc += 4;
@@ -303,33 +335,53 @@ fn main() -> ! {
             }
             0xF000 => {
                 match kk {
+                    // plane X
+                    0x01 => {
+                        // IGNORE
+                        state.pc += 2;
+                    }
+                    // vX := delay
                     0x07 => {
                         state.v[x as usize] = state.delay_timer;
                         state.pc += 2;
                     }
+                    // vX := key
                     0x0A => {
                         let key = get_keypress(&mut event_pump);
                         state.v[x as usize] = key;
                         state.pc += 2;
                     }
+                    // delay := vX
                     0x15 => {
                         state.delay_timer = state.v[x as usize];
                         state.pc += 2;
                     }
+                    // i += vX
                     0x1E => {
                         state.i += state.v[x as usize] as u16;
                         state.pc += 2;
                     }
+                    // i := hex vX
                     0x29 => {
                         state.i = state.v[x as usize] as u16 * 5;
                         state.pc += 2;
                     }
+                    // bcd vX
                     0x33 => {
                         state.memory[state.i as usize] = state.v[x as usize] / 100;
                         state.memory[state.i as usize + 1] = (state.v[x as usize] / 10) % 10;
                         state.memory[state.i as usize + 2] = state.v[x as usize] % 10;
                         state.pc += 2;
                     }
+                    // save vX
+                    0x55 => {
+                        for i in 0..x+1 {
+                            state.memory[(state.i + i as u16) as usize] = state.v[i as usize];
+                        }
+                        state.i += x + 1;
+                        state.pc += 2;
+                    }
+                    // load vX
                     0x65 => {
                         for i in 0..x+1 {
                             state.v[i as usize] = state.memory[(state.i + i as u16) as usize];
@@ -347,6 +399,7 @@ fn main() -> ! {
             }
         }
 
+        // update timers
         if state.delay_timer > 0 {
             state.delay_timer -= 1;
         }
