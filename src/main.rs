@@ -1,3 +1,13 @@
+extern crate sdl2;
+
+use sdl2::event::{self, Event};
+use sdl2::keyboard::Keycode;
+use sdl2::pixels::Color;
+use sdl2::rect::Rect;
+use sdl2::render::Canvas;
+use sdl2::video::Window;
+use sdl2::{EventPump, Sdl};
+
 struct Chip8State {
     memory: [u8; 4096], // 4KB
     v: [u8; 16],        // V0 - VF
@@ -59,7 +69,7 @@ fn get_input() -> u8 {
     }
 }
 
-fn draw_screen(gfx: [u8; 64 * 32]) {
+fn _draw_screen_console(gfx: [u8; 64 * 32]) {
     for y in 0..32 {
         for x in 0..64 {
             let pixel = gfx[y * 64 + x];
@@ -73,9 +83,66 @@ fn draw_screen(gfx: [u8; 64 * 32]) {
     }
 }
 
+fn draw_screen_sdl(gfx: [u8; 64 * 32], canvas: &mut Canvas<Window>) {
+    canvas.set_draw_color(Color::RGB(0, 0, 0));
+    canvas.clear();
+
+    canvas.set_draw_color(Color::RGB(255, 255, 255));
+    for y in 0..32 {
+        for x in 0..64 {
+            if gfx[y * 64 + x] != 0 {
+                let _ = canvas.fill_rect(Rect::new(x as i32 * 10, y as i32 * 10, 10, 10));
+            }
+        }
+    }
+    canvas.present();
+}
+
+fn get_keypress(event_pump: &mut EventPump) -> u8 {
+    loop {
+        for event in event_pump.poll_iter() {
+            match event {
+                Event::KeyDown { keycode: Some(keycode), .. } => {
+                    match keycode {
+                        Keycode::Num1 => return 0x1,
+                        Keycode::Num2 => return 0x2,
+                        Keycode::Num3 => return 0x3,
+                        Keycode::Num4 => return 0xC,
+                        Keycode::Q => return 0x4,
+                        Keycode::W => return 0x5,
+                        Keycode::E => return 0x6,
+                        Keycode::R => return 0xD,
+                        Keycode::A => return 0x7,
+                        Keycode::S => return 0x8,
+                        Keycode::D => return 0x9,
+                        Keycode::F => return 0xE,
+                        Keycode::Z => return 0xA,
+                        Keycode::X => return 0x0,
+                        Keycode::C => return 0xB,
+                        Keycode::V => return 0xF,
+                        _ => {}
+                    }
+                },
+                _ => {}
+            }
+        }
+    }
+}
+
 fn main() -> ! {
-    let fps: u64 = 60;
-    let cap_fps: bool = false;
+    let sdl_context = sdl2::init().unwrap();
+    let video_subsystem = sdl_context.video().unwrap();
+    let mut event_pump = sdl_context.event_pump().unwrap();
+
+    let window = video_subsystem.window("CHIP-8 Emulator", 640, 320)
+        .position_centered()
+        .build()
+        .unwrap();
+
+    let mut canvas = window.into_canvas().build().unwrap();
+
+    let fps: u64 = 240;
+    let cap_fps: bool = true;
 
     let rom = std::fs::read("rom/superpong.ch8").unwrap();
 
@@ -230,8 +297,7 @@ fn main() -> ! {
                         state.pc += 2;
                     }
                     0x0A => {
-                        let key = get_input();
-                        println!("Key: 0x{:02X}", key);
+                        let key = get_keypress(&mut event_pump);
                         state.v[x as usize] = key;
                         state.pc += 2;
                     }
@@ -270,7 +336,60 @@ fn main() -> ! {
             }
         }
 
-        draw_screen(state.gfx);
+        if state.delay_timer > 0 {
+            state.delay_timer -= 1;
+        }
+
+        draw_screen_sdl(state.gfx, &mut canvas);
+
+        for event in event_pump.poll_iter() {
+            match event {
+                sdl2::event::Event::Quit {..} => std::process::exit(0),
+                sdl2::event::Event::KeyDown { keycode: Some(keycode), .. } => {
+                    match keycode {
+                        sdl2::keyboard::Keycode::Num1 => state.key[0x1] = 1,
+                        sdl2::keyboard::Keycode::Num2 => state.key[0x2] = 1,
+                        sdl2::keyboard::Keycode::Num3 => state.key[0x3] = 1,
+                        sdl2::keyboard::Keycode::Num4 => state.key[0xC] = 1,
+                        sdl2::keyboard::Keycode::Q => state.key[0x4] = 1,
+                        sdl2::keyboard::Keycode::W => state.key[0x5] = 1,
+                        sdl2::keyboard::Keycode::E => state.key[0x6] = 1,
+                        sdl2::keyboard::Keycode::R => state.key[0xD] = 1,
+                        sdl2::keyboard::Keycode::A => state.key[0x7] = 1,
+                        sdl2::keyboard::Keycode::S => state.key[0x8] = 1,
+                        sdl2::keyboard::Keycode::D => state.key[0x9] = 1,
+                        sdl2::keyboard::Keycode::F => state.key[0xE] = 1,
+                        sdl2::keyboard::Keycode::Z => state.key[0xA] = 1,
+                        sdl2::keyboard::Keycode::X => state.key[0x0] = 1,
+                        sdl2::keyboard::Keycode::C => state.key[0xB] = 1,
+                        sdl2::keyboard::Keycode::V => state.key[0xF] = 1,
+                        _ => {}
+                    }
+                },
+                sdl2::event::Event::KeyUp { keycode: Some(keycode), .. } => {
+                    match keycode {
+                        sdl2::keyboard::Keycode::Num1 => state.key[0x1] = 0,
+                        sdl2::keyboard::Keycode::Num2 => state.key[0x2] = 0,
+                        sdl2::keyboard::Keycode::Num3 => state.key[0x3] = 0,
+                        sdl2::keyboard::Keycode::Num4 => state.key[0xC] = 0,
+                        sdl2::keyboard::Keycode::Q => state.key[0x4] = 0,
+                        sdl2::keyboard::Keycode::W => state.key[0x5] = 0,
+                        sdl2::keyboard::Keycode::E => state.key[0x6] = 0,
+                        sdl2::keyboard::Keycode::R => state.key[0xD] = 0,
+                        sdl2::keyboard::Keycode::A => state.key[0x7] = 0,
+                        sdl2::keyboard::Keycode::S => state.key[0x8] = 0,
+                        sdl2::keyboard::Keycode::D => state.key[0x9] = 0,
+                        sdl2::keyboard::Keycode::F => state.key[0xE] = 0,
+                        sdl2::keyboard::Keycode::Z => state.key[0xA] = 0,
+                        sdl2::keyboard::Keycode::X => state.key[0x0] = 0,
+                        sdl2::keyboard::Keycode::C => state.key[0xB] = 0,
+                        sdl2::keyboard::Keycode::V => state.key[0xF] = 0,
+                        _ => {}
+                    }
+                },
+                _ => {}
+            }
+        }
 
         if cap_fps { std::thread::sleep(std::time::Duration::from_millis(1000 / fps)) };
     }
