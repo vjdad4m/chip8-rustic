@@ -127,6 +127,21 @@ pub fn process_instruction(
                     state.v[x as usize] = state.v[y as usize];
                     state.pc += 2;
                 }
+                // vX |= vY
+                0x1 => {
+                    state.v[x as usize] |= state.v[y as usize];
+                    state.pc += 2;
+                }
+                // vX &= vY
+                0x2 => {
+                    state.v[x as usize] &= state.v[y as usize];
+                    state.pc += 2;
+                }
+                // vX ^= vY
+                0x3 => {
+                    state.v[x as usize] ^= state.v[y as usize];
+                    state.pc += 2;
+                }
                 // vX += vY
                 0x4 => {
                     let sum = state.v[x as usize] as u16 + state.v[y as usize] as u16;
@@ -144,6 +159,12 @@ pub fn process_instruction(
                     state.v[x as usize] = state.v[x as usize].wrapping_sub(state.v[y as usize]);
                     state.pc += 2;
                 }
+                // vX >>= vY
+                0x6 => {
+                    state.v[0xF] = state.v[x as usize] & 0x1;
+                    state.v[x as usize] >>= 1;
+                    state.pc += 2;
+                }
                 // vX =- vY
                 0x7 => {
                     if state.v[y as usize] > state.v[x as usize] {
@@ -152,6 +173,12 @@ pub fn process_instruction(
                         state.v[0xF] = 0;
                     }
                     state.v[x as usize] = state.v[y as usize].wrapping_sub(state.v[x as usize]);
+                    state.pc += 2;
+                }
+                // vX <<= vY
+                0xE => {
+                    state.v[0xF] = state.v[x as usize] >> 7;
+                    state.v[x as usize] <<= 1;
                     state.pc += 2;
                 }
                 _ => {
