@@ -230,6 +230,11 @@ pub fn process_instruction(state: &mut Chip8State, opcode: u16, event_pump: &mut
                     state.delay_timer = state.v[x as usize];
                     state.pc += 2;
                 }
+                // buzzer := vX
+                0x18 => {
+                    state.sound_timer = state.v[x as usize];
+                    state.pc += 2;
+                }
                 // i += vX
                 0x1E => {
                     state.i += state.v[x as usize] as u16;
