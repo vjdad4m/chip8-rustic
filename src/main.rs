@@ -130,6 +130,9 @@ fn get_keypress(event_pump: &mut EventPump) -> u8 {
 }
 
 fn main() -> ! {
+    let fps: u64 = 480;
+    let cap_fps: bool = true;
+
     let sdl_context = sdl2::init().unwrap();
     let video_subsystem = sdl_context.video().unwrap();
     let mut event_pump = sdl_context.event_pump().unwrap();
@@ -140,9 +143,6 @@ fn main() -> ! {
         .unwrap();
 
     let mut canvas = window.into_canvas().build().unwrap();
-
-    let fps: u64 = 240;
-    let cap_fps: bool = true;
 
     let rom = std::fs::read("rom/superpong.ch8").unwrap();
 
@@ -220,6 +220,10 @@ fn main() -> ! {
             }
             0x8000 => {
                 match n {
+                    0x0 => {
+                        state.v[x as usize] = state.v[y as usize];
+                        state.pc += 2;
+                    }
                     0x4 => {
                         let sum = state.v[x as usize] as u16 + state.v[y as usize] as u16;
                         state.v[0xF] = if sum > 0xFF { 1 } else { 0 };
@@ -266,7 +270,7 @@ fn main() -> ! {
                     let pixel = state.memory[state.i as usize + yline];
                     for xline in 0..8 {
                         if (pixel & (0x80 >> xline)) != 0 {
-                            let pos = x + xline + ((y + yline) * 64);
+                            let pos = (x + xline + ((y + yline) * 64)) % (64 * 32);
                             if state.gfx[pos] == 1 {
                                 state.v[0xF] = 1;
                             }
@@ -278,6 +282,13 @@ fn main() -> ! {
             }
             0xE000 => {
                 match kk {
+                    0x9E => {
+                        if state.key[state.v[x as usize] as usize] == 1 {
+                            state.pc += 4;
+                        } else {
+                            state.pc += 2;
+                        }
+                    }
                     0xA1 => {
                         if state.key[state.v[x as usize] as usize] == 0 {
                             state.pc += 4;
