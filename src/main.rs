@@ -17,6 +17,7 @@ fn main() -> ! {
         .arg(
             Arg::new("rom")
                 .help("Sets the ROM file to use")
+                .long("rom")
                 .required(false)
                 .index(1)
                 .default_value("rom/superpong.ch8"),
@@ -32,6 +33,13 @@ fn main() -> ! {
             Arg::new("cap_fps")
                 .help("Caps the frames per second")
                 .long("cap-fps")
+                .default_value("true")
+                .value_parser(clap::value_parser!(bool)),
+        )
+        .arg(
+            Arg::new("panic_on_unknown")
+                .help("Panic on uknown opcodes")
+                .long("panic-on-unknown")
                 .default_value("true")
                 .value_parser(clap::value_parser!(bool)),
         )
@@ -53,11 +61,13 @@ fn main() -> ! {
     let mut state = Chip8State::new();
     state.load_rom(&rom);
 
+    let panic_on_unknown: bool = *matches.get_one::<bool>("panic_on_unknown").unwrap();
+
     loop {
         let frame_start = Instant::now();
 
         let opcode = fetch_instruction(&state);
-        process_instruction(&mut state, opcode, &mut event_pump);
+        process_instruction(&mut state, opcode, &mut event_pump, panic_on_unknown);
 
         handle_keypress(&mut state, &mut event_pump);
 

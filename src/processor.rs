@@ -2,8 +2,8 @@ use sdl2::{event::Event, keyboard::Keycode, EventPump};
 
 pub struct Chip8State {
     pub memory: [u8; 4096], // 4KB
-    pub v: [u8; 16], // V0 - VF
-    pub i: u16, // 12 bit register
+    pub v: [u8; 16],        // V0 - VF
+    pub i: u16,             // 12 bit register
     pub pc: u16,
     pub gfx: [u8; 64 * 32],
     pub delay_timer: u8,
@@ -43,7 +43,12 @@ pub fn fetch_instruction(state: &Chip8State) -> u16 {
     byte1 << 8 | byte2
 }
 
-pub fn process_instruction(state: &mut Chip8State, opcode: u16, event_pump: &mut EventPump) {
+pub fn process_instruction(
+    state: &mut Chip8State,
+    opcode: u16,
+    event_pump: &mut EventPump,
+    panic_on_unknown: bool,
+) {
     let inst = opcode & 0xF000;
     let address: u16 = opcode & 0x0FFF;
     let x: u16 = (opcode & 0x0F00) >> 8;
@@ -60,7 +65,7 @@ pub fn process_instruction(state: &mut Chip8State, opcode: u16, event_pump: &mut
                     state.pc += 2;
                 }
                 // return
-                0x00EE =>  {
+                0x00EE => {
                     state.sp -= 1;
                     state.pc = state.stack[state.sp as usize];
                     state.pc += 2;
@@ -83,18 +88,27 @@ pub fn process_instruction(state: &mut Chip8State, opcode: u16, event_pump: &mut
         }
         // if vX != NN then
         0x3000 => {
-            if state.v[x as usize] == kk as u8 { state.pc += 4; }
-            else { state.pc += 2; }
+            if state.v[x as usize] == kk as u8 {
+                state.pc += 4;
+            } else {
+                state.pc += 2;
+            }
         }
         // if vX == NN then
         0x4000 => {
-            if state.v[x as usize] != kk as u8 { state.pc += 4; }
-            else { state.pc += 2; }
+            if state.v[x as usize] != kk as u8 {
+                state.pc += 4;
+            } else {
+                state.pc += 2;
+            }
         }
         // if vX != vY then
         0x5000 => {
-            if state.v[x as usize] == state.v[y as usize] { state.pc += 4; }
-            else { state.pc += 2; }
+            if state.v[x as usize] == state.v[y as usize] {
+                state.pc += 4;
+            } else {
+                state.pc += 2;
+            }
         }
         // vX := NN
         0x6000 => {
@@ -141,14 +155,21 @@ pub fn process_instruction(state: &mut Chip8State, opcode: u16, event_pump: &mut
                     state.pc += 2;
                 }
                 _ => {
-                    panic!("Unknown instruction: 0x{:04X} (0x{:4X})", inst, opcode);
+                    if panic_on_unknown {
+                        panic!("Unknown instruction: 0x{:04X} (0x{:4X})", inst, opcode);
+                    } else {
+                        state.pc += 2;
+                    }
                 }
             }
         }
         // if vX == vY then
         0x9000 => {
-            if state.v[x as usize] != state.v[y as usize] { state.pc += 4; }
-            else { state.pc += 2; }
+            if state.v[x as usize] != state.v[y as usize] {
+                state.pc += 4;
+            } else {
+                state.pc += 2;
+            }
         }
         // i := NNN
         0xA000 => {
@@ -203,7 +224,11 @@ pub fn process_instruction(state: &mut Chip8State, opcode: u16, event_pump: &mut
                     }
                 }
                 _ => {
-                    panic!("Unknown instruction: 0x{:04X} (0x{:4X})", inst, opcode);
+                    if panic_on_unknown {
+                        panic!("Unknown instruction: 0x{:04X} (0x{:4X})", inst, opcode);
+                    } else {
+                        state.pc += 2;
+                    }
                 }
             }
         }
@@ -254,7 +279,7 @@ pub fn process_instruction(state: &mut Chip8State, opcode: u16, event_pump: &mut
                 }
                 // save vX
                 0x55 => {
-                    for i in 0..x+1 {
+                    for i in 0..x + 1 {
                         state.memory[(state.i + i as u16) as usize] = state.v[i as usize];
                     }
                     state.i += x + 1;
@@ -262,19 +287,27 @@ pub fn process_instruction(state: &mut Chip8State, opcode: u16, event_pump: &mut
                 }
                 // load vX
                 0x65 => {
-                    for i in 0..x+1 {
+                    for i in 0..x + 1 {
                         state.v[i as usize] = state.memory[(state.i + i as u16) as usize];
                     }
                     state.i += x + 1;
                     state.pc += 2;
                 }
                 _ => {
-                    panic!("Unknown instruction: 0x{:04X} (0x{:4X})", inst, opcode);
+                    if panic_on_unknown {
+                        panic!("Unknown instruction: 0x{:04X} (0x{:4X})", inst, opcode);
+                    } else {
+                        state.pc += 2;
+                    }
                 }
             }
         }
         _ => {
-            panic!("Unknown instruction: 0x{:04X} (0x{:4X})", inst, opcode);
+            if panic_on_unknown {
+                panic!("Unknown instruction: 0x{:04X} (0x{:4X})", inst, opcode);
+            } else {
+                state.pc += 2;
+            }
         }
     }
 
@@ -292,27 +325,28 @@ pub fn get_latest_keypress(event_pump: &mut EventPump) -> u8 {
         for event in event_pump.poll_iter() {
             match event {
                 Event::Quit { .. } => std::process::exit(0),
-                Event::KeyDown { keycode: Some(keycode), .. } => {
-                    match keycode {
-                        Keycode::Num1 => return 0x1,
-                        Keycode::Num2 => return 0x2,
-                        Keycode::Num3 => return 0x3,
-                        Keycode::Num4 => return 0xC,
-                        Keycode::Q => return 0x4,
-                        Keycode::W => return 0x5,
-                        Keycode::E => return 0x6,
-                        Keycode::R => return 0xD,
-                        Keycode::A => return 0x7,
-                        Keycode::S => return 0x8,
-                        Keycode::D => return 0x9,
-                        Keycode::F => return 0xE,
-                        Keycode::Z => return 0xA,
-                        Keycode::X => return 0x0,
-                        Keycode::C => return 0xB,
-                        Keycode::V => return 0xF,
-                        _ => {}
-                    }
-                }
+                Event::KeyDown {
+                    keycode: Some(keycode),
+                    ..
+                } => match keycode {
+                    Keycode::Num1 => return 0x1,
+                    Keycode::Num2 => return 0x2,
+                    Keycode::Num3 => return 0x3,
+                    Keycode::Num4 => return 0xC,
+                    Keycode::Q => return 0x4,
+                    Keycode::W => return 0x5,
+                    Keycode::E => return 0x6,
+                    Keycode::R => return 0xD,
+                    Keycode::A => return 0x7,
+                    Keycode::S => return 0x8,
+                    Keycode::D => return 0x9,
+                    Keycode::F => return 0xE,
+                    Keycode::Z => return 0xA,
+                    Keycode::X => return 0x0,
+                    Keycode::C => return 0xB,
+                    Keycode::V => return 0xF,
+                    _ => {}
+                },
                 _ => {}
             }
         }
@@ -323,48 +357,50 @@ pub fn handle_keypress(state: &mut Chip8State, event_pump: &mut EventPump) {
     for event in event_pump.poll_iter() {
         match event {
             Event::Quit { .. } => std::process::exit(0),
-            Event::KeyDown { keycode: Some(keycode), .. } => {
-                match keycode {
-                    Keycode::Num1 => state.key[0x1] = 1,
-                    Keycode::Num2 => state.key[0x2] = 1,
-                    Keycode::Num3 => state.key[0x3] = 1,
-                    Keycode::Num4 => state.key[0xC] = 1,
-                    Keycode::Q => state.key[0x4] = 1,
-                    Keycode::W => state.key[0x5] = 1,
-                    Keycode::E => state.key[0x6] = 1,
-                    Keycode::R => state.key[0xD] = 1,
-                    Keycode::A => state.key[0x7] = 1,
-                    Keycode::S => state.key[0x8] = 1,
-                    Keycode::D => state.key[0x9] = 1,
-                    Keycode::F => state.key[0xE] = 1,
-                    Keycode::Z => state.key[0xA] = 1,
-                    Keycode::X => state.key[0x0] = 1,
-                    Keycode::C => state.key[0xB] = 1,
-                    Keycode::V => state.key[0xF] = 1,
-                    _ => {}
-                }
-            }
-            Event::KeyUp { keycode: Some(keycode), .. } => {
-                match keycode {
-                    Keycode::Num1 => state.key[0x1] = 0,
-                    Keycode::Num2 => state.key[0x2] = 0,
-                    Keycode::Num3 => state.key[0x3] = 0,
-                    Keycode::Num4 => state.key[0xC] = 0,
-                    Keycode::Q => state.key[0x4] = 0,
-                    Keycode::W => state.key[0x5] = 0,
-                    Keycode::E => state.key[0x6] = 0,
-                    Keycode::R => state.key[0xD] = 0,
-                    Keycode::A => state.key[0x7] = 0,
-                    Keycode::S => state.key[0x8] = 0,
-                    Keycode::D => state.key[0x9] = 0,
-                    Keycode::F => state.key[0xE] = 0,
-                    Keycode::Z => state.key[0xA] = 0,
-                    Keycode::X => state.key[0x0] = 0,
-                    Keycode::C => state.key[0xB] = 0,
-                    Keycode::V => state.key[0xF] = 0,
-                    _ => {}
-                }
-            }
+            Event::KeyDown {
+                keycode: Some(keycode),
+                ..
+            } => match keycode {
+                Keycode::Num1 => state.key[0x1] = 1,
+                Keycode::Num2 => state.key[0x2] = 1,
+                Keycode::Num3 => state.key[0x3] = 1,
+                Keycode::Num4 => state.key[0xC] = 1,
+                Keycode::Q => state.key[0x4] = 1,
+                Keycode::W => state.key[0x5] = 1,
+                Keycode::E => state.key[0x6] = 1,
+                Keycode::R => state.key[0xD] = 1,
+                Keycode::A => state.key[0x7] = 1,
+                Keycode::S => state.key[0x8] = 1,
+                Keycode::D => state.key[0x9] = 1,
+                Keycode::F => state.key[0xE] = 1,
+                Keycode::Z => state.key[0xA] = 1,
+                Keycode::X => state.key[0x0] = 1,
+                Keycode::C => state.key[0xB] = 1,
+                Keycode::V => state.key[0xF] = 1,
+                _ => {}
+            },
+            Event::KeyUp {
+                keycode: Some(keycode),
+                ..
+            } => match keycode {
+                Keycode::Num1 => state.key[0x1] = 0,
+                Keycode::Num2 => state.key[0x2] = 0,
+                Keycode::Num3 => state.key[0x3] = 0,
+                Keycode::Num4 => state.key[0xC] = 0,
+                Keycode::Q => state.key[0x4] = 0,
+                Keycode::W => state.key[0x5] = 0,
+                Keycode::E => state.key[0x6] = 0,
+                Keycode::R => state.key[0xD] = 0,
+                Keycode::A => state.key[0x7] = 0,
+                Keycode::S => state.key[0x8] = 0,
+                Keycode::D => state.key[0x9] = 0,
+                Keycode::F => state.key[0xE] = 0,
+                Keycode::Z => state.key[0xA] = 0,
+                Keycode::X => state.key[0x0] = 0,
+                Keycode::C => state.key[0xB] = 0,
+                Keycode::V => state.key[0xF] = 0,
+                _ => {}
+            },
             _ => {}
         }
     }
