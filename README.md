@@ -9,6 +9,8 @@
 
 This project is a CHIP-8 emulator, which allows you to play classic CHIP-8 games on modern hardware. The emulator is built using Rust and SDL2 for rendering.
 
+<img src="assets/pong.gif" alt="chip8 emulation of superpong">
+
 <h2 id="installation">Installation</h2>
 
 To set up the CHIP-8 emulator, you need to install SDL2 for rust. For guidance on installing SDL2, especially on Windows, refer to the instructions provided in [this GitHub issue comment](https://github.com/PistonDevelopers/piston-examples/issues/391#issuecomment-336219251).
