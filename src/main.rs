@@ -4,9 +4,9 @@ mod display;
 mod processor;
 
 use clap::{Arg, Command};
+use display::{draw_screen_sdl, setup_display};
+use processor::{fetch_instruction, handle_keypress, process_instruction, Chip8State};
 use std::fs;
-use display::{setup_display, draw_screen_sdl};
-use processor::{Chip8State, fetch_instruction, process_instruction, handle_keypress};
 
 fn main() -> ! {
     let matches = Command::new("CHIP-8 Emulator")
@@ -18,14 +18,28 @@ fn main() -> ! {
                 .help("Sets the ROM file to use")
                 .required(false)
                 .index(1)
-                .default_value("rom/superpong.ch8"),
+                .default_value("rom/superpong.ch8")
+        )
+        .arg(
+            Arg::new("fps")
+                .help("Sets the frames per second")
+                .long("fps")
+                .default_value("1000")
+                .value_parser(clap::value_parser!(u64))
+        )
+        .arg(
+            Arg::new("cap_fps")
+                .help("Caps the frames per second")
+                .long("cap-fps")
+                .default_value("true")
+                .value_parser(clap::value_parser!(bool))
         )
         .get_matches();
 
     let rom_path = matches.get_one::<String>("rom").unwrap();
 
-    let fps: u64 = 1000;
-    let cap_fps: bool = true;
+    let fps: u64 = *matches.get_one::<u64>("fps").unwrap();
+    let cap_fps: bool = *matches.get_one::<bool>("cap_fps").unwrap();
 
     let (mut canvas, mut event_pump) = setup_display();
 
@@ -45,6 +59,8 @@ fn main() -> ! {
 
         draw_screen_sdl(state.gfx, &mut canvas);
 
-        if cap_fps { std::thread::sleep(std::time::Duration::from_millis(1000 / fps)); }
+        if cap_fps {
+            std::thread::sleep(std::time::Duration::from_millis(1000 / fps));
+        }
     }
 }
