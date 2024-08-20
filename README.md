@@ -29,6 +29,8 @@ cargo run --release <path-to-rom-file>
 
 Replace `<path-to-rom-file>` with the path to your desired CHIP-8 ROM.
 
+You can donwload ROMs from [John Earnest's Chip8 Community Archive](https://github.com/JohnEarnest/chip8Archive).
+
 <h2 id="chip-8-overview">CHIP-8 Overview</h2>
 
 CHIP-8 is an interpreted programming language developed by Joseph Weisbecker in the mid-1970s. It was designed for simplicity and ease of programming, primarily used on 8-bit microcomputers like the COSMAC VIP and Telmac 1800. CHIP-8 programs are typically games and demos, and the language has been implemented on various platforms, including modern computers, calculators, and mobile devices. For more information, visit the [CHIP-8 Wikipedia page](https://en.wikipedia.org/wiki/CHIP-8).
